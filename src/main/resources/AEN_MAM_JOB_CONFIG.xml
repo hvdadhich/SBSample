@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:batch="http://www.springframework.org/schema/batch"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/batch   http://www.springframework.org/schema/batch/spring-batch-2.2.xsd   http://www.springframework.org/schema/beans    http://www.springframework.org/schema/beans/spring-beans-3.2.xsd  ">
+
+	<import resource="application-context.xml" />
+
+
+
+
+	<batch:job id="AEN_MAM_JOB">
+		<batch:listeners>
+			<batch:listener ref="customJobExecutionListener" />
+		</batch:listeners>
+
+		<batch:step id="BranchRevisionRegister"
+			next="validateStepdecision">
+			<batch:tasklet ref="branchRevisionFetchTasklet" />
+			<batch:listeners>
+				<batch:listener ref="customJobExecutionListener" />
+				<batch:listener ref="customStepTimeListener" />
+			</batch:listeners>
+
+		</batch:step>
+
+
+		<batch:step id="validateStep"
+			next="billerExecutiondecision">
+			<batch:tasklet task-executor="simpleAsyncTaskExecutor">
+				<batch:chunk reader="inputItemReader"
+					writer="itemWriter" commit-interval="50000" skip-limit="10000" >
+					<batch:skippable-exception-classes>
+						<batch:include
+							class="org.springframework.batch.item.file.FlatFileParseException" />
+					</batch:skippable-exception-classes>					
+				</batch:chunk>
+				<batch:listeners>
+					<batch:listener ref="customSkipListener" />
+					<batch:listener ref="customItemReaderListener" />
+					<batch:listener ref="customStepTimeListener" />
+					<batch:listener ref="customItemWriteListener"/>					
+				</batch:listeners>
+			</batch:tasklet>
+		</batch:step>
+
+
+		<batch:step id="billerExecutionStep"
+			next="billerUpdatedecision">
+			<batch:tasklet task-executor="simpleAsyncTaskExecutor">
+				<batch:chunk reader="inputItemReader" writer="cbWriter"
+					commit-interval="50000" skip-limit="10000" >
+					<batch:skippable-exception-classes>
+						<batch:include
+							class="org.springframework.batch.item.file.FlatFileParseException" />
+					</batch:skippable-exception-classes>
+									
+				</batch:chunk>
+				<batch:listeners>
+					<batch:listener ref="customStepTimeListener" />
+					<batch:listener ref="customItemReaderListener" />
+					<batch:listener ref="customItemWriteListener"/>
+					
+				</batch:listeners>
+				
+
+			</batch:tasklet>			
+		</batch:step>
+
+
+		<batch:step id="branchRevisionUpdaterStep">
+			<batch:tasklet ref="branchRevisionUpdater" />
+			<batch:listeners>
+				<batch:listener ref="customStepTimeListener" />
+			</batch:listeners>
+
+		</batch:step>
+
+
+
+
+
+		<batch:decision id="validateStepdecision"
+			decider="decider">
+			<batch:next on="NOTSTARTED" to="failedAtStartStep" />
+			<batch:next on="INVALIDATE" to="invalidateFileStep" />
+			<batch:next on="VALIDATED" to="validateStep" />
+		</batch:decision>
+
+		<batch:decision id="billerExecutiondecision"
+			decider="decider">
+			<batch:next on="NOTSTARTED" to="failedAtStartStep" />
+			<batch:next on="INVALIDATE" to="invalidateFileStep" />
+			<batch:next on="VALIDATED" to="billerExecutionStep" />
+		</batch:decision>
+
+		<batch:decision id="billerUpdatedecision"
+			decider="decider">
+			<batch:next on="NOTSTARTED" to="failedAtStartStep" />
+			<batch:next on="INVALIDATE" to="invalidateFileStep" />
+			<batch:next on="VALIDATED" to="branchRevisionUpdaterStep" />
+		</batch:decision>
+
+
+		<batch:step id="failedAtStartStep">
+			<batch:tasklet ref="failedAtStartTasklet" />
+			<batch:listeners>
+				<batch:listener ref="customStepTimeListener" />
+			</batch:listeners>
+
+		</batch:step>
+
+		<batch:step id="invalidateFileStep">
+			<batch:tasklet ref="invalidateFileTasklet" />
+			<batch:listeners>
+				<batch:listener ref="customStepTimeListener" />
+			</batch:listeners>
+
+		</batch:step>
+
+	</batch:job>
+
+	<bean id="simpleAsyncTaskExecutor"
+		class="org.springframework.core.task.SimpleAsyncTaskExecutor">
+	</bean>
+
+	<bean id="branchRevisionFetchTasklet"
+		class="com.wu.qcc.tasklet.BranchRevisionFetchTasklet" scope="step">
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+		<property name="filePath" value="#{jobParameters['dataFile']}" />
+	</bean>
+
+	<bean id="branchRevisionUpdater"
+		class="com.wu.qcc.tasklet.BranchRevisionUpdateTasklet" scope="step">
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+	</bean>
+
+	<!-- <bean id="decider" class="com.wu.onep.cpay.mamloader.mapper.FlowDecider" 
+		/> -->
+	<bean id="blankLineRecordSeparatorPolicy"
+		class="com.wu.qcc.reader.BlankLineRecordSeparatorPolicy" />
+	<bean id="inputItemReader"
+		class="org.springframework.batch.item.file.FlatFileItemReader" scope="step">
+		<property name="resource" value="#{jobParameters['dataFile']}" />
+		<property name="recordSeparatorPolicy"
+			ref="blankLineRecordSeparatorPolicy" />
+		<property name="lineMapper">
+			<bean
+				class="org.springframework.batch.item.file.mapping.DefaultLineMapper">
+				<property name="lineTokenizer">
+					<bean
+						class="org.springframework.batch.item.file.transform.FixedLengthTokenizer">
+						<property name="strict" value="false"></property>
+						<property name="names"
+							value="account, jurisdiction"></property>
+						<property name="columns" value="1-13, 41-43"></property>
+					</bean>
+				</property>
+				<property name="fieldSetMapper">
+					<bean class="com.wu.qcc.mapper.RootFieldMapper" scope="step">
+						<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+					</bean>
+				</property>
+			</bean>
+		</property>
+		<property name="linesToSkip" value="0" />
+	</bean>
+	<bean id="itemWriter" class="com.wu.qcc.writer.DummyWriter" />
+
+	<bean id="cbWriter" class="com.wu.qcc.writer.CBWriter" scope="step">
+		<property name="customAccountWrite" value="true" />
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+	</bean>
+
+
+	<bean id="failedAtStartTasklet"
+		class="com.wu.qcc.tasklet.FailedAtStartTasklet" scope="step">
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+	</bean>
+
+
+	<bean id="invalidateFileTasklet"
+		class="com.wu.qcc.tasklet.InvalidateFileTasklet" scope="step">
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+	</bean>
+
+
+	<bean id="decider" class="com.wu.qcc.deciders.BatchFlowDecider" />
+
+
+
+	<bean id="customSkipListener" class="com.wu.qcc.listeners.CustomSkipListener" scope="step">
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+		<property name="skipLimit" value="4" />
+	</bean>
+	<bean id="customItemReaderListener"
+		class="com.wu.qcc.listeners.InputReadListener" scope="step">
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+		
+	</bean>
+	<bean id="customItemWriteListener"
+		class="com.wu.qcc.listeners.CustomWriteListener" scope="step">
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+		
+	</bean>
+
+
+
+
+</beans>

@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+    http://www.springframework.org/schema/beans/spring-beans.xsd
+    http://www.springframework.org/schema/context
+    http://www.springframework.org/schema/context/spring-context.xsd">
+
+	<!-- <context:annotation-config/> -->
+	<context:component-scan
+		base-package="com.wu.qcc.repository.*" />
+
+	<bean id="input" class="com.wu.qcc.model.BillerMetaData" />
+	<bean id="branchrevisiontracker"
+		class="com.wu.qcc.model.BranchRevisionDAO" />
+	<bean id="billerFactory"
+		class="com.wu.qcc.interfaces.factory.ExtendedBillerListFactory" />
+	<bean id="fieldSetFactory"
+		class="com.wu.qcc.interfaces.factory.FieldSetMapperFactory" />
+	<bean id="branchRevisionUtil"
+		class="com.wu.qcc.util.BranchRevisionUtil" />
+	<bean id="billerTypeFactory"
+		class="com.wu.qcc.interfaces.factory.LoadTypeFactory" />
+	<bean id="customStepTimeListener"
+		class="com.wu.qcc.listeners.CustomStepTimeExceutionListener" scope="step" >
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+		</bean>
+	<bean id="customJobExecutionListener"
+		class="com.wu.qcc.listeners.CustomJobExecutionListener" />
+	<bean id="customRetryListener"
+		class="com.wu.qcc.listeners.CustomRetryListener" scope="step">
+		<property name="billerPrefix" value="#{jobParameters['billerPrefix']}" />
+		
+	</bean>
+
+
+
+</beans>

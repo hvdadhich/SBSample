@@ -1,0 +1,83 @@
+{
+	"configuration": {
+		"status": "WARN",
+		"name": "JSONConfig",
+		"packages": "com.wu",
+		"ThresholdFilter": {
+			"level": "DEBUG"
+		},
+		"appenders": {
+			"Console": [{
+				"name": "ConsoleJSONAppender",
+				"target": "SYSTEM_OUT",
+				"SimpleJSONLayout": {
+					"properties": true
+				}
+			},
+				{
+					"name": "BasicConsoleJSONAppender",
+					"target": "SYSTEM_OUT",
+					"SimpleJSONLayout": {
+						"properties": false
+					}
+				},
+				{
+					"name": "DefaultConsoleAppender",
+					"target": "SYSTEM_OUT",
+					"PatternLayout": {
+						"pattern": "%d %-5p [%15.15t] %-40.40c{1.}: %m%n"
+					}
+				}],
+			"RollingFile": {
+				"name": "JSONRollingfileAppender",
+				"fileName": "logs/logfile.log",
+				"filePattern": "logs/logfile-%d{yyyy-MM-dd}-%i.log.gz",
+				"SimpleJSONLayout": {
+					"properties": true
+				},
+				"BurstFilter": {
+					"level": "INFO",
+					"rate": "2",
+					"maxBurst": "10"
+				},
+				"Policies": {
+					"SizeBasedTriggeringPolicy": {
+						"size": "200 MB"
+					},
+					"OnStartupTriggeringPolicy": [],
+					"TimeBasedTriggeringPolicy": []
+				},
+				"DefaultRolloverStrategy": {
+					"max": "10"
+				}
+			}
+		},
+		"loggers": {
+			"AsyncLogger": [
+				{
+					"name": "org.springframework",
+					"additivity": "false",
+					"level": "ERROR",
+					"AppenderRef": {
+						"ref": "JSONRollingfileAppender"
+					}
+				},
+				
+				{
+					"name": "com.wu",
+					"additivity": "false",
+					"level": "INFO",
+					"AppenderRef": {
+						"ref": "JSONRollingfileAppender"
+					}
+				}
+			],
+			"AsyncRoot": {
+				"level": "INFO",
+				"AppenderRef": {
+					"ref": "JSONRollingfileAppender"
+				}
+			}
+		}
+	}
+}
